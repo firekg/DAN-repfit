@@ -31,7 +31,6 @@ fastfit_spec()
 you should see many waves and variables generated in NewGlobalFit
 go into the function fastfxt() and check all the lines labeled "CHECK"
 
-
 PREP FOR FIT STEP 2:
 manully fill in ori_mat, the origin parameters.
 first column is the initial guesses for origin positions.
@@ -47,7 +46,7 @@ for MIM, the parameters are:
 // 4) fork velocity, 
 // 5) time factor for one initiator, for MIM
 // 6) rate of one initiator, for MIM
-RUN the following 2 lines:
+RUN the following line:
 glo_w[0,5] = {15, 0, 1, 2, 76, 3}
 MAKE FAKE ORIGIN POSITIONS:
 RUN the following 4 lines:
@@ -73,7 +72,6 @@ PREP FOR FIT STEP 3:
 go into the function GenSMFitDialogWave() and check all the lines labeled "CHECK"
 RUN the following line:
 GenSMFitDialogWave()
-
 
 SETTING UP FIT 1:
 THE INSTRUCTION BELOW USES THE FAKE DATA:
@@ -106,7 +104,6 @@ check that some of the constraints boxes are filled. Press Done.
 in Data Browser, delete "MoreContraintsListWave"
 in Options section, uncheck "Covariance Matrix" and check "No History Output."
 in Global Analysis, click "Fit!"
-
 
 SEE RESULTS:
 fit parameters should be stored in Coef_XXX

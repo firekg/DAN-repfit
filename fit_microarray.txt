@@ -14,20 +14,19 @@ make/d/o/n=(1,1000) it_intgr = 0
 
 variable/g n_pt_probe = 253 //CHECK: number of probe on microarray
 make/d/o/n=(n_ori, n_pt_probe) LnGxt_dense //log g(x,t)
-make/d/o/n=(1, n_pt_probe) Lngt = 0
+make/d/o/n=(1, 200) Lngt = 0
 
 variable/g n_probe_start = 0 //CHECK: start position of data in kb (or any unit)
 
 make/d/o/n=(n_pt_probe) miarray_theo_yw = 0 //f(x,t)
 
-//uncomment these if wants to generate fake data
+//CHECK: uncomment these if wants to generate fake data
 setscale x, n_probe_start, n_probe_start + n_pt_probe, "", miarray_theo_yw //set scale of f(x,t)
 make/d/o/n=(n_pt_probe) xw = p + n_probe_start //the position wave
 
 // used in GenSMFitDialogWave
 variable/g n_probe_strlimit = 0 //CHECK: lower bound on start position in kb (or any unit)
 variable/g n_probe_endlimit = n_pt_probe //CHECK: upper bound on end position in kb (or any unit)
-
 
 end
 
