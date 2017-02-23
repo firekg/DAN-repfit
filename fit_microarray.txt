@@ -1,0 +1,231 @@
+//----------initialize waves to be used in fit_miarray-----------------
+function fastfit_spec()
+
+variable/g n_tp = 6 //CHECK: number of time points probed
+variable/g n_ori = 8 //CHECK: number of origins
+variable/g ori_spec_coef = 2 //CHECK: SM uses 3 (loc, time_fac, rate); MIM uses 2: (loc, n)
+make/d/o/n=(n_ori, ori_spec_coef) ori_mat //place holder for origin parameters
+
+variable/g n_glo_spec = 6 //CHECK: SM uses 4 (time, background, normalization factor, velocity); 
+								//MIM uses 6, the above + (glo_ori_tfac, glo_ori_rate)
+make/d/o/n=(n_glo_spec) glo_w //place holder for global parameters
+
+make/d/o/n=(1,1000) it_intgr = 0
+
+variable/g n_pt_probe = 253 //CHECK: number of probe on microarray
+make/d/o/n=(n_ori, n_pt_probe) LnGxt_dense //log g(x,t)
+make/d/o/n=(1, n_pt_probe) Lngt = 0
+
+variable/g n_probe_start = 0 //CHECK: start position of data in kb (or any unit)
+
+make/d/o/n=(n_pt_probe) miarray_theo_yw = 0 //f(x,t)
+
+//uncomment these if wants to generate fake data
+setscale x, n_probe_start, n_probe_start + n_pt_probe, "", miarray_theo_yw //set scale of f(x,t)
+make/d/o/n=(n_pt_probe) xw = p + n_probe_start //the position wave
+
+// used in GenSMFitDialogWave
+variable/g n_probe_strlimit = 0 //CHECK: lower bound on start position in kb (or any unit)
+variable/g n_probe_endlimit = n_pt_probe //CHECK: upper bound on end position in kb (or any unit)
+
+
+end
+
+//--------------generating initial guess wave, error wave, ori_mat-------------
+//--------------upper/lower constraint waves for sigmoid model-------
+function GenSMFitDialogWave()
+
+NVAR n_ori, ori_spec_coef, n_glo_spec, n_tp
+NVAR n_probe_strlimit, n_probe_endlimit
+
+variable total_pnt = n_glo_spec + n_ori*ori_spec_coef + (n_tp-1)*2 //total number of parameters
+make/d/o/n=(total_pnt) IniGuess, ewave, holdw = 0
+make/t/o/n=(total_pnt) constr_low, constr_high
+
+//global factors parameters: 
+// 1) first time point, 
+// 2) background signal
+// 3) normalization factor
+// 4) fork velocity, 
+// 5) time factor for one initiator, for MIM
+// 6) rate of one initiator, for MIM
+IniGuess[0,5] = {15, 0, 1, 2, 76, 3} //CHECK: initial guess for global params. 4 for SM, 6 for MIM
+ewave[0,5] = {0.1, 0.1, 0.01, 0.01, 3, 0.01} //CHECK: estimated error variance. 4 for SM, 6 for MIM
+holdw[0] = 1
+holdw[4,5] = 1 //CHECK: comment out for SM
+constr_low[0,5] = {"", "-1", "0.3", "1", "", ""} //CHECK: lower bound on global parameters. 4 for SM, 6 for MIM
+constr_high[0,5] = {"", "1", "3", "4", "", ""} //CHECK: upper bound on global parameters. 4 for SM, 6 for MIM
+
+//CHECK: ori_mat has been filled manually already
+wave ori_mat
+variable i
+for(i=0; i<n_ori; i+=1)
+	IniGuess[n_glo_spec+0+i*ori_spec_coef] = ori_mat[i][0] //origin position
+	IniGuess[n_glo_spec+1+i*ori_spec_coef] = ori_mat[i][1] //SM t_half, or MIM n
+//	IniGuess[n_glo_spec+2+i*ori_spec_coef] = ori_mat[i][2] //CHECK: uncomment for SM, rate
+
+	ewave[n_glo_spec+0+i*ori_spec_coef] = 1 //variance on origin position
+	ewave[n_glo_spec+1+i*ori_spec_coef] = 1 //variance on SM t_half or MIM n
+//	ewave[n_glo_spec+2+i*ori_spec_coef] = 0.01 //CHECK: uncomment for SM, variance on rate
+
+	if(ori_mat[i][0] - 10 > n_probe_strlimit)
+		constr_low[n_glo_spec + i*ori_spec_coef] = num2str(ori_mat[i][0]-10) //lower bound on origin positions
+	else
+		constr_low[n_glo_spec + i*ori_spec_coef] = num2str(n_probe_strlimit)
+	endif
+	constr_low[n_glo_spec+1+i*ori_spec_coef] = "1" //lower bound on SM t_half or MIM n
+//	constr_low[n_glo_spec+2+i*ori_spec_coef] = "1" //CHECK: uncomment for SM, lower bound on rate
+
+	if(ori_mat[i][0] + 10 < n_probe_endlimit)
+		constr_high[n_glo_spec + i*ori_spec_coef] = num2str(ori_mat[i][0]+10) //upper bound on origin positions
+	else
+		constr_high[n_glo_spec + i*ori_spec_coef] = num2str(n_probe_endlimit)
+	endif
+	constr_high[n_glo_spec + 1 + i*ori_spec_coef] = "200" //upper bound on SM t_half or MIM n
+//	constr_high[n_glo_spec+2+i*ori_spec_coef] = "12" //CHECK: uncomment for SM, upper bound on rate
+
+	if (ori_mat[i][1]==10000)
+		holdw[n_glo_spec+0+i*ori_spec_coef]=1
+		holdw[n_glo_spec+1+i*ori_spec_coef]=1
+//		holdw[n_glo_spec+2+i*ori_spec_coef]=1 //CHECK: uncomment for SM
+	endif
+endfor
+
+//the last (n_tp-1)*2 entries
+IniGuess[total_pnt-10, total_pnt-1] = {20, 1, 25, 1, 30, 1, 35, 1, 40, 1} //CHECK: follow the squence: time point, 1, ... 
+ewave[total_pnt-10, total_pnt-1] = {0.1, 0.01, 0.1, 0.01, 0.1, 0.01,0.1, 0.01,0.1, 0.01} //CHECK: number of elements match the above. Follow the sequence: 0.1, 0.01, ...
+holdw[total_pnt-10, total_pnt-1] = {1, 0, 1, 0, 1, 0, 1, 0, 1, 0} //CHECK: number of elements match the above. Follow the sequence 1, 0, ...
+constr_low[total_pnt-10, total_pnt-1] = {"", "0.6", "", "0.6", "", "0.6", "", "0.6", "", "0.6"} //CHECK: number of elements match the above. Follow the sequence: "", "0.6",...
+constr_high[total_pnt-10, total_pnt-1] = {"", "2", "", "1.5",  "", "1.5",  "", "1.5", "", "1.5"} //CHECK: number of elements match the above. upper bounds:  "", "1.5",...
+
+for(i=0; i<total_pnt; i+=1)
+	if(holdw[i]==1)
+		constr_low[i] = ""
+		constr_high[i] = ""
+	endif
+endfor
+
+end
+
+//---------------all-at-once-fit for microarrray data-------------------
+function fastfit_miarray_all(pw, yw, xw) : FitFunc
+wave pw, yw, xw
+
+NVAR n_ori, ori_spec_coef, n_glo_spec, n_pt_probe, n_probe_start
+wave ori_mat, glo_w
+
+glo_w={pw[0], pw[1], pw[2], pw[3], pw[4], pw[5]}
+variable i, j, k = n_glo_spec
+for(i=0; i<n_ori; i+=1)
+	for(j=0; j<ori_spec_coef; j+=1)
+		ori_mat[i][j]=pw[k]
+		k+=1
+	endfor
+endfor
+
+fastfxt(ori_mat, glo_w, xw)
+wave miarray_theo_yw
+//smooth/b=1 10, miarray_theo_yw
+yw = miarray_theo_yw[xw-n_probe_start]
+
+end
+
+//-------------faster microarray curve generator----------------
+function fastfxt(ori_mat, glo_w, xw)
+wave ori_mat, glo_w, xw
+
+//timer
+//	variable timer2, timer1 = startMSTimer
+
+NVAR n_ori, ori_spec_coef, n_glo_spec, n_pt_probe, n_probe_start, n_probe_endlimit
+
+wave it_intgr, Lngt, LnGxt_dense, miarray_theo_yw
+Lngt = 0  //initialize
+LnGxt_dense = 0  //initialize
+variable tp = glo_w[0]
+variable bg = glo_w[1]
+variable nor_fac = glo_w[2]
+variable v = glo_w[3]
+variable glo_tfac = glo_w[4] //CHECK: MIM only, comment out if use SM
+variable glo_rate = glo_w[5] //CHECK: MIM only, comment out if use SM
+setscale/I y, 0, tp, it_intgr //diff: /I
+setscale/I y, 0, n_probe_endlimit, it_intgr //diff: new
+
+variable i, j, k, t_fac, rate, pre_fac, local_n, n_nonzero, t_edge, ori_x, ind_init, ind_last
+n_nonzero = v*tp
+
+for(i=0; i<n_ori; i+=1)
+
+	//CHECK: uncomment the following 3 lines if use SM
+//	t_fac = ori_mat[i][1]
+//	rate = ori_mat[i][2]
+//	it_intgr = y^rate/(y^rate + t_fac^rate)
+
+	//CHECK: uncomment the following 2 lines if use MIM
+	local_n = ori_mat[i][1]
+	it_intgr = 1 - (1 - y^glo_rate/(y^glo_rate + glo_tfac^glo_rate))^local_n
+
+	// not the most efficient code for sparse xw
+	Lngt[0][0, n_nonzero-1] = (it_intgr[0](tp - y/v) > 0.999)? -100000: ln(1 - it_intgr[0](tp - y/v)) //diff: y was q
+
+	ori_x = ori_mat[i][0] - n_probe_start
+	ind_init = max(0, ori_x - n_nonzero - 1) //diff: new 
+	ind_last = min(ori_x + n_nonzero - 1, n_pt_probe - 1) //diff: new
+	LnGxt_dense[i][ori_x, ind_last] = Lngt[0][max(0, q - ori_x)] //bottom half, right fork; diff: max operation
+	LnGxt_dense[i][ind_init, ori_x] = Lngt[0][max(0, ori_x - q)] //upper half, left fork; diff: max operation
+
+endfor
+
+variable addto, array_ele
+for(i=0;i<n_pt_probe; i+=1)
+	array_ele=0
+	for(j=0; j<n_ori; j+=1)
+		addto = LnGxt_dense[j][i]
+		array_ele = array_ele + addto
+	endfor
+	//miarray_theo_yw[i] = ((1 - exp(array_ele))*100 + bg)*nor_fac //CHECK: use if data is replication percentage
+	miarray_theo_yw[i] = ((1 - exp(array_ele)) + 1 + bg)*nor_fac //CHECK: use if data is copy number
+endfor
+
+//smooth/b=1 10, miarray_theo_yw //for visulization
+
+//timer2 = stopMSTimer(timer1)		// stop the timer
+//print "CPU Time:", timer2/1e6
+
+end
+
+
+//---------------for making fake data------------
+function make_ywT()
+
+wave ori_mat, glo_w, xw, miarray_theo_yw //CHECKL ori_mat and glo_w are filled,
+													 // and xw, miarray_theo_yw exist
+NVAR n_tp //CHECK: n_pt is defined, and the following two lines have n_pt elements
+make/o timePoints = {15, 20, 25, 30, 35, 40}
+make/o scale = {1, 1, 1, 1, 1, 1}
+
+NVAR n_pt_probe //CHECK n_pt_probe is defined
+make/o/n=(n_pt_probe, n_tp) ywT
+
+variable t_ind
+for(t_ind=0; t_ind<n_tp; t_ind+=1)
+	glo_w[0] = timePoints[t_ind]
+	glo_w[2] = scale[t_ind]
+	fastfxt(ori_mat, glo_w, xw)
+	ywT[][t_ind] = miarray_theo_yw[p]
+endfor
+
+end
+
+//---------------produce LINK in golbal fit------------
+function Link_All_col(inw)
+wave/T inw
+
+variable n_row=dimsize(inw,0), n_col=dimsize(inw,1)
+variable i
+
+for(i=0;i<n_col;i+=1)
+	inw[1,n_row][i][0]="LINK:"+inw[0][i][0]
+endfor
+
+end	
