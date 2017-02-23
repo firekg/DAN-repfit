@@ -1,0 +1,114 @@
+THIS DEMO USES THE Multiple Initiator Model (MIM) 
+IT IS TESTED ON ONLY THIS MODEL AND WITH THE FOLLOWING SETTING
+IF YOU RUN INTO PROBLEMS, PLEASE CONTACT ME AT scott.cheng.hsin.yang@gmail.com
+
+OPEN DATA BROWSER
+Data --> Data Broswer
+
+A NOTE
+you can RUN inline code by selecting a line and Ctrl+Enter.
+RUN the following line:
+variable a = 1
+"a" should appear in Data Browser under the "root" folder.
+
+OPEN GLOBAL FIT WINDOW:
+Analysis --> Packages --> Global Fit
+
+CHANGE FOLDER:
+in Data Browser, find Packages/NewGlobalFit, ctrl+click "NewGlobalFit"--> Set Current Data Folder
+
+IN THIS DEMO, WE WILL MAKE FAKE DATA AND FIT TO IT.
+BUT IF YOU HAVE DATA, YOU CAN LOAD THEM NOW:
+one way is: Data --> Load Waves --> choose the one you want.
+another way is: Windows --> New Table; then copy and paste the data, and rename them.
+There should be 1 array for position, 
+and 1 array for the replication fraction at each probed time point.
+
+PREPARE FOR FIT STEP 1:
+go into the function fastfit_spec() and check all the lines labeled "CHECK"
+RUN the following line:
+fastfit_spec()
+you should see many waves and variables generated in NewGlobalFit
+go into the function fastfxt() and check all the lines labeled "CHECK"
+
+
+PREP FOR FIT STEP 2:
+manully fill in ori_mat, the origin parameters.
+first column is the initial guesses for origin positions.
+second column is the initial guesses for number of initiators.
+
+IF YOU LOADED DATA, SKIP THIS.
+MAKE SOME FAKE DATA:
+fill in glo_w, the global parameters:
+for MIM, the parameters are: 
+// 1) first time point, 
+// 2) background signal
+// 3) normalization factor
+// 4) fork velocity, 
+// 5) time factor for one initiator, for MIM
+// 6) rate of one initiator, for MIM
+RUN the following 2 lines:
+glo_w[0,5] = {15, 0, 1, 2, 76, 3}
+MAKE FAKE ORIGIN POSITIONS:
+RUN the following 4 lines:
+variable dx = (n_pt_probe - n_probe_strlimit - 20)/n_ori
+ori_mat[][0] = dx*p + 10
+ori_mat[][1] = enoise(20, n_ori) + 30
+make/o/d/n=(n_ori, 2) ori_mat_data = ori_mat
+MAKE FAKE REPLICATION FRACTION
+RUN the following 7 lines:
+make_ywT()
+make/d/o/n=(n_pt_probe) yw_t1 = ywT[p][0] + gnoise(0.03)
+make/d/o/n=(n_pt_probe) yw_t2 = ywT[p][1] + gnoise(0.03)
+make/d/o/n=(n_pt_probe) yw_t3 = ywT[p][2] + gnoise(0.03)
+make/d/o/n=(n_pt_probe) yw_t4 = ywT[p][3] + gnoise(0.03)
+make/d/o/n=(n_pt_probe) yw_t5 = ywT[p][4] + gnoise(0.03)
+make/d/o/n=(n_pt_probe) yw_t6 = ywT[p][5] + gnoise(0.03)
+REINITIALIZE PARAMETERS FOR FIT:
+RUN the following 2 lines:
+ori_mat[][0] = dx*p + 10 + enoise(5)
+ori_mat[][1] = enoise(20, n_ori) + 30
+
+PREP FOR FIT STEP 3:
+go into the function GenSMFitDialogWave() and check all the lines labeled "CHECK"
+RUN the following line:
+GenSMFitDialogWave()
+
+
+SETTING UP FIT 1:
+THE INSTRUCTION BELOW USES THE FAKE DATA:
+under "Data Sets and Functions" tab --> "Data Sets" panel --> "Add Data Sets" pull down menu:
+add yw_t1 to yw_t6 (or your time course data).
+click "X Waves" --> ctrl+click again --> select xw (or your position wave).
+(can ignore error)
+click "Function" --> ctrl+click again --> select fastfit_miarray_all
+for "# Coefs," use n_ori*ori_spec_coef + n_glo_sepc (for fake data case, 8*2 + 6 = 22) for all.
+RUN the following line:
+Link_All_col(NewGF_MainCoefListWave)
+(can ignore error)
+under "Coefficients" section:
+select Coefs-K0, then click "Unlink Selection."
+select K2, then click "Unlink Selection."
+these two operations says that
+the time points and normalization factors are not shared across the time-course data,
+but all the other parameters are.
+
+SETTING UP FIT 2:
+under "Coefficient Control" Tab:
+click "Initial Guess" --> Load From Wave... --> select "IniGuess"
+click "Hold?" --> Load From Wave... --> select "IniGuess"
+click "Epsilon" --> Load From Wave... --> select "ewave"
+in "Options" section, click "Constraints..."
+RUN the following 2 lines:
+SimpleConstraintsListWave[][2]=constr_low[p]
+SimpleConstraintsListWave[][4]=constr_high[p]
+check that some of the constraints boxes are filled. Press Done.
+in Data Browser, delete "MoreContraintsListWave"
+in Options section, uncheck "Covariance Matrix" and check "No History Output."
+in Global Analysis, click "Fit!"
+
+
+SEE RESULTS:
+fit parameters should be stored in Coef_XXX
+fit fraction should be stored in GFit_XXX
+ori_mat, the fit adjusted parameters, should now look similar to the ori_mat_data, the original parameters.

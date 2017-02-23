@@ -1,0 +1,631 @@
+//----------wave pool to be called by fit_miarray-----------------
+function fastfit_spec()
+
+variable/g n_ori=8//352 //number of origins
+variable/g ori_spec_coef=2//3 //number of coefs to specify an origin
+make/d/o/n=(n_ori, ori_spec_coef) ori_mat //a matrix containing all origins' spec: ori_pos, ori_shape_coefs
+
+variable/g n_glo_spec=6//4	//number of coefs to specify global fitting par:
+					// time, background, normalization factor, velocity, glo_ori_tfac, glo_ori_rate
+make/d/o/n=(n_glo_spec) glo_w
+
+make/o/n=(1000) vt_intgr  //velocity wave integrated
+//make/o/n=(1000) it_intgr   //initiation wave integrated
+make/d/o/n=(1,1000) it_intgr=0
+
+wave len
+variable/g n_pt_probe =253//sum(len,0,15)+150*16//sum(len,0,2)+150*3//232+150//+815//+150+318 //number of probe on microarray, L/win_len, or simply L
+make/d/o/n=(n_ori, n_pt_probe) LnGxt_dense
+//make/d/o/n=(400) Lngt  // length > (time + time_shift)*v //no more time shift
+make/d/o/n=(1,200) Lngt=0
+
+variable/g n_probe_start = 0//sum(len, 0, 11)+150*11  //absolute start of original data, a reference point for bootstrapping
+variable/g n_probe_strlimit = 0//sum(len, 0, 11)+150*12  //absolute start of original data, a reference point for bootstrapping
+variable/g n_probe_endlimit = 253//sum(len,0,15)+150*15
+
+make/d/o/n=(n_pt_probe) miarray_theo_yw=0//, xw_ind
+//setscale x, n_probe_start, n_probe_start+n_pt_probe,"",miarray_theo_yw
+//make/d/o/n=(n_pt_probe) xw=p + n_probe_start
+
+end
+
+//--------------generating initial guess wave, error wave, ori_mat-------------
+//--------------upper/lower constraint waves for sigmoid model-------
+function GenSMFitDialogWave()
+
+NVAR n_ori, ori_spec_coef, n_glo_spec
+NVAR n_probe_strlimit, n_probe_endlimit
+
+variable total_pnt= n_glo_spec + n_ori*ori_spec_coef + 10 //14 = 7 time points + 7 nor fac
+make/d/o/n=(total_pnt) IniGuess, ewave, holdw=0
+make/t/o/n=(total_pnt) constr_low, constr_high
+
+//for global factors: time, background, normalization factor, velocity
+IniGuess[0,5]={15, 0, 1, 2, 76, 3}
+ewave[0,5]={0.1, 0.1, 0.01, 0.01, 3, 0.01}
+holdw[0]=1
+holdw[4,5]=1
+constr_low[0,5]={"", "-1", "0.3", "1", "", ""}
+constr_high[0,5]={"", "1", "3", "4", "", ""}
+
+//for origin info
+wave ori_mat
+variable i
+for(i=0; i<n_ori; i+=1)
+	IniGuess[n_glo_spec+0+i*ori_spec_coef]=ori_mat[i][0] //origin position
+	IniGuess[n_glo_spec+1+i*ori_spec_coef]=ori_mat[i][1] //t_half
+//	IniGuess[n_glo_spec+2+i*ori_spec_coef]=ori_mat[i][2] //rate
+//	IniGuess[n_glo_spec+3+i*ori_spec_coef]=ori_mat[i][3] //velocity
+
+	ewave[n_glo_spec+0+i*ori_spec_coef]=1 //ori pos
+	ewave[n_glo_spec+1+i*ori_spec_coef]=1 //t_half
+//	ewave[n_glo_spec+2+i*ori_spec_coef]=0.01 //rate
+//	ewave[n_glo_spec+3+i*ori_spec_coef]=0.01 //velocity
+
+	if(ori_mat[i][0]-10> n_probe_strlimit)
+	constr_low[n_glo_spec+0+i*ori_spec_coef]=num2str(ori_mat[i][0]-10) //ori_pos
+	else
+	constr_low[n_glo_spec+0+i*ori_spec_coef]=num2str( n_probe_strlimit)
+	endif
+	constr_low[n_glo_spec+1+i*ori_spec_coef]="1" //t_half
+//	constr_low[n_glo_spec+2+i*ori_spec_coef]="1" //rate
+//	constr_low[n_glo_spec+3+i*ori_spec_coef]="1" //velocity
+
+	if(ori_mat[i][0]+10< n_probe_endlimit)
+	constr_high[n_glo_spec+0+i*ori_spec_coef]=num2str(ori_mat[i][0]+10) //ori_pos
+	else
+	constr_high[n_glo_spec+0+i*ori_spec_coef]=num2str(n_probe_endlimit)
+	endif
+	constr_high[n_glo_spec+1+i*ori_spec_coef]="200" //t_half
+//	constr_high[n_glo_spec+2+i*ori_spec_coef]="12" //rate
+//	constr_high[n_glo_spec+3+i*ori_spec_coef]="4" //velocity
+
+	if (ori_mat[i][1]==10000)
+		holdw[n_glo_spec+0+i*ori_spec_coef]=1
+		holdw[n_glo_spec+1+i*ori_spec_coef]=1
+//		holdw[n_glo_spec+2+i*ori_spec_coef]=1
+//		holdw[n_glo_spec+3+i*ori_spec_coef]=1
+	endif
+endfor
+
+//the last 10 entries
+IniGuess[total_pnt-10, total_pnt-1]={20, 1, 25, 1, 30, 1, 35, 1, 40, 1}
+ewave[total_pnt-10, total_pnt-1]={0.1, 0.01, 0.1, 0.01, 0.1, 0.01,0.1, 0.01,0.1, 0.01}
+holdw[total_pnt-10, total_pnt-1]={1, 0, 1, 0, 1, 0,1, 0, 1, 0}
+constr_low[total_pnt-10, total_pnt-1]={"", "0.6", "", "0.6", "", "0.6", "", "0.6", "", "0.6"}
+constr_high[total_pnt-10, total_pnt-1]={"", "2", "", "1.5",  "", "1.5",  "", "1.5", "", "1.5"}
+
+for(i=0;i<total_pnt;i+=1)
+if(holdw[i]==1)
+	constr_low[i]=""
+	constr_high[i]=""
+endif
+endfor
+
+end
+
+//---------------all-at-once-fit for microarrray data-------------------
+function fastfit_miarray_all(pw, yw, xw) : FitFunc
+wave pw, yw, xw
+
+NVAR n_ori, ori_spec_coef, n_glo_spec, n_pt_probe, n_probe_start
+wave ori_mat, glo_w
+
+glo_w={pw[0], pw[1], pw[2], pw[3], pw[4], pw[5]}
+variable i, j, k = n_glo_spec
+for(i=0; i<n_ori; i+=1)
+	for(j=0; j<ori_spec_coef; j+=1)
+		ori_mat[i][j]=pw[k]
+		k+=1
+	endfor
+endfor
+
+fastfxt(ori_mat, glo_w, xw)
+wave miarray_theo_yw
+//smooth/b=1 10, miarray_theo_yw
+yw = miarray_theo_yw[xw-n_probe_start]
+
+end
+
+//-------------faster microarray curve generator----------------
+function fastfxt(ori_mat, glo_w, xw)
+wave ori_mat, glo_w, xw
+
+//	variable timer2, timer1 = startMSTimer
+
+NVAR n_ori, ori_spec_coef, n_glo_spec, n_pt_probe, n_probe_start
+
+wave it_intgr, Lngt, LnGxt_dense, miarray_theo_yw
+Lngt = 0  //initialize
+LnGxt_dense = 0  //initialize
+variable tp=glo_w[0], bg=glo_w[1], nor_fac=glo_w[2], v=glo_w[3], glo_tfac=glo_w[4], glo_rate=glo_w[5]
+//tp=tp+bg //this using bg as time shift
+//setscale x, 0.0001, tp, it_intgr
+setscale y, 0, tp, it_intgr
+
+variable i, j, k, t_fac, rate, pre_fac, local_n, n_nonzero, t_edge, ori_x
+n_nonzero=v*tp//v*tp
+
+//MicroArrayFitFunc(ori_mat, glo_w, it_intgr, Lngt, LnGxt_dense, miarray_theo_yw, n_ori, n_probe_start, n_pt_probe)
+
+
+for(i=0; i<n_ori; i+=1)
+
+	//sigmoid model (SM)
+//	t_fac = ori_mat[i][1]
+//	rate = ori_mat[i][2]
+//	v = ori_mat[i][3]
+//	it_intgr=x^rate/(x^rate+t_fac^rate)
+//	it_intgr=y^rate/(y^rate+t_fac^rate)
+//	for(j=0; j<tp; j+=tp/1000)
+//		it_intgr[0][j*1000/tp]= j^rate/(j^rate+t_fac^rate)
+//	endfor
+	//normally distributed model (NDM)
+//	it_intgr=StatsNormalCDF(y, ori_mat[i][1], ori_mat[i][2])
+
+	//multiple initiator model (MIM)
+	local_n = ori_mat[i][1]
+//	pre_fac = (glo_n+1)/glo_tfac^(glo_n+1)
+//	it_intgr = (pre_fac/(glo_n+1)*y^(glo_n+1)>0.9999)? 1 : 1-(1-pre_fac/(glo_n+1)*y^(glo_n+1))^local_n
+	it_intgr = 1-(1- y^glo_rate/(y^glo_rate+glo_tfac^glo_rate) )^local_n
+
+	// xw relatively well spaced 1kb, not the most efficient code for sparse xw
+	Lngt[0][0, n_nonzero-1]=(it_intgr[0](tp-q/v)>0.999)? -100000: ln( 1-it_intgr[0](tp-q/v) )
+//	for(j=0;j<=n_nonzero-1;j+=1)
+//		k=(tp-j/v)*999/tp
+//		if(it_intgr[0][k] >0.999)
+//			Lngt[0][j] = -100000
+//		else
+//			Lngt[0][j] = ln( 1-it_intgr[0][k] )
+//		endif
+//	endfor
+
+	ori_x = ori_mat[i][0]-n_probe_start
+	LnGxt_dense[i][ori_x,ori_x+n_nonzero-1]= Lngt[0][q-ori_x] //bottom half, right fork
+//	for(j=ori_x; j<=ori_x+n_nonzero-1; j+=1)
+//		LnGxt_dense[i][j]= Lngt[0][j-ori_x]
+//	endfor
+	LnGxt_dense[i][ori_x-n_nonzero-1,ori_x]= Lngt[0][ori_x-q]  // upper half, left fork
+//	for(j=ori_x-n_nonzero-1; j<=ori_x; j+=1)
+//		LnGxt_dense[i][j]= Lngt[0][ori_x-j]
+//	endfor
+
+endfor
+
+//ImageTransform sumAllCols LnGxt_dense
+//wave W_sumCols, miarray_theo_yw, xw_ind
+//xw_ind = xw - n_probe_start //change xw into index for W_sumCols resolution =/= 1kb
+//miarray_theo_yw = ((1-exp(W_sumCols[xw_ind] ))*100 + bg)*nor_fac
+//
+variable addto, array_ele
+for(i=0;i<n_pt_probe; i+=1)
+	array_ele=0
+//	addto=0
+	for(j=0; j<n_ori; j+=1)
+		addto = LnGxt_dense[j][i]
+		array_ele = array_ele + addto
+	endfor
+	//miarray_theo_yw[i]=((1-exp(array_ele) )*100 + bg)*nor_fac //replication percentage
+	miarray_theo_yw[i]=( (1-exp(array_ele)) + 1 + bg)*nor_fac //copy number
+endfor
+
+//smooth/b=1 10, miarray_theo_yw
+
+	//timer2 = stopMSTimer(timer1)		// stop the timer
+	//print "CPU Time:", timer2/1e6
+
+end
+//--------------------------------------------------
+function Pw2Mat(all_coef) //this is for Sigmoid model
+wave all_coef
+
+//variable npt, num_ori
+//npt = numpnts(pw)
+//num_ori = (npt-18)/3
+//
+//make/o/n=(4,8) glo_mat_check
+//make/o/n=(num_ori,3) ori_mat_check
+//
+//variable i, j, k = 4
+//for(i=0; i<num_ori; i+=1)
+//	for(j=0; j<3; j+=1)
+//		ori_mat_check[i][j]=all_coef[k]
+//		k+=1
+//	endfor
+//endfor
+//
+//glo_mat_check[][0]={all_coef[0], all_coef[1], all_coef[2], all_coef[3]}
+
+variable n_ori=352
+variable n_glo_spec=4
+variable ori_spec_coef=3
+
+make/o/n=(n_ori, ori_spec_coef) error_mat
+
+variable i, j, k = n_glo_spec
+for(i=0; i<n_ori; i+=1)
+	for(j=0; j<ori_spec_coef; j+=1)
+		error_mat[i][j]=all_coef[k]
+		k+=1
+	endfor
+endfor
+
+
+end
+//-------------generating t_50 and t_width-------------------
+function Ori_thalf_twidth(ori_rate, ori_thalf, ori_n)
+wave ori_rate, ori_thalf, ori_n
+
+//variable npt=numpnts(ori_rate) //for sigmoid model
+variable npt=numpnts(ori_n)  //for multiple initiator model
+make/o/n=(npt) ori_thalf_MIM
+make/o/n=1000 temp_rep
+setscale x,0,200,"", temp_rep
+
+make/o/n=(npt) ori_twidth_MIM
+variable i, rate, thalf, lev25
+for(i=0; i<npt; i+=1)
+	//for sigmoid model
+//	rate=ori_rate[i]
+//	thalf=ori_thalf[i]
+//	temp_rep=x^rate/(x^rate+thalf^rate)
+	//for multiple initiator model
+	rate= 2.7
+	thalf= 59
+	temp_rep = 1 - (1-x^rate/(x^rate+thalf^rate) )^ori_n[i]
+	Findlevel/q temp_rep, 0.5
+	ori_thalf_MIM[i]=V_LevelX
+	Findlevel/q temp_rep, 0.25
+	lev25=V_LevelX
+	Findlevel/q temp_rep, 0.75
+	ori_twidth_MIM[i]=V_LevelX-lev25
+endfor
+killwaves temp_rep
+end
+//---------check what phi0(t) to use-------------------
+function GenPhi0t(thalf, rate, n)
+variable thalf, rate, n
+
+make/o/n=1000 phi0t, phit_eff
+setscale x,0,100,"", phi0t, phit_eff
+
+phi0t = n*rate*thalf^rate*x^(rate-1)/(x^rate+thalf^rate)^2 * (1-x^rate/(x^rate+thalf^rate) )^(n-1)
+phit_eff = 1 - (1-x^rate/(x^rate+thalf^rate) )^(n)
+
+end
+function GenPhitMIMall()
+
+make/o/n=(1000,40) phit_MIM, b_phit_MIM
+make/o/n=400 eff_intr_MIM
+setscale x,0,100,phit_MIM
+variable n,j=0
+for(n=0.5;n<80.5;n+=2)
+	GenPhi0t(100,2.3,n)
+	wave phi0t, phit_eff
+	phit_MIM[][j]=phi0t[p]
+	b_phit_MIM[][j]=phit_eff[p]
+	wave phit_eff
+	eff_intr_MIM[j]=phit_eff(60)
+	j+=1
+	endfor
+end
+//----------generate phi(t), I(t) & intrinsic efficiency-------------------
+function GenPhitAndEff(ori_mat)
+wave ori_mat
+
+variable rate, thalf, i, npt
+npt=dimsize(ori_mat,0)
+make/o/n=(npt) eff_intr, pdf_max
+make/o/n=1000 s_phit, b_phit, it
+//make/o/n=(1000,npt) b_phit_all, s_phit_all, it_all
+//cell cycle time should scaling here, 100 as a default
+setscale x,0.0001,80,"", s_phit, b_phit, it//, s_phit_all, b_phit_all, it_all
+
+for(i=0;i<npt; i+=1)
+	rate=ori_mat[i][2]
+	thalf=ori_mat[i][1]
+	b_phit=x^rate/(x^rate+thalf^rate)
+	s_phit=rate*thalf^rate*x^(rate-1)/(x^rate+thalf^rate)^2
+//	it=s_phit/(1-b_phit)
+	eff_intr[i]=b_phit[750]
+//	s_phit_all[][i]=s_phit[p]
+//	differentiate s_phit /d=ss_phit
+//	ss_phit_all[][i]=ss_phit[p]
+	wavestats /q s_phit
+	pdf_max[i]=V_maxloc
+//	b_phit_all[][i]=b_phit[p]
+//	it_all[][i]=it[p]
+endfor
+killwaves s_phit, b_phit, it
+end
+
+function GenPhitAndEffMIM(ori_n)
+wave ori_n
+
+variable rate, thalf, n, i, npt
+npt=numpnts(ori_n)
+make/o/n=(npt) eff_intr_mim, pdf_max_mim
+make/o/n=1000 s_phit, b_phit, it
+make/o/n=(1000,npt) b_phit_all_mim, s_phit_all_mim, it_all_mim
+//cell cycle time should scaling here, 100 as a default
+setscale x,0.0001,80,"", s_phit, b_phit, it, s_phit_all_mim, b_phit_all_mim, it_all_mim
+rate=2.7
+thalf=57
+
+for(i=0;i<npt; i+=1)
+	n=ori_n[i]
+	b_phit=1-(1-x^rate/(x^rate+thalf^rate) )^n
+	s_phit=rate*thalf^rate*x^(rate-1)/(x^rate+thalf^rate)^2*n*(1-x^rate/(x^rate+thalf^rate) )^(n-1)
+	it=s_phit/(1-b_phit)
+
+	eff_intr_mim[i]=b_phit[750]
+	s_phit_all_mim[][i]=s_phit[p]
+	wavestats /q s_phit
+	pdf_max_mim[i]=V_maxloc
+	b_phit_all_mim[][i]=b_phit[p]
+	it_all_mim[][i]=it[p]
+endfor
+killwaves s_phit, b_phit, it
+end
+
+
+//--------generate phi_eff(t) & observed efficiency--------------------
+//----------man...this is a total mess---------------------
+function GenObsPhitAndEff(ori_mat, ori_chr)
+wave ori_mat, ori_chr
+
+variable v=1.6
+variable t_end=100
+variable i, j, npt
+npt=dimsize(ori_mat,0)
+make/o/n=(npt) first_effori_ind, last_effori_ind
+
+wave b_phit_all, s_phit_all
+
+for(i=0; i<npt; i+=1)
+	j=i
+	do
+		j-=1
+	while(ori_mat[j][0]>=ori_mat[i][0]-v*t_end && ori_chr[j]==ori_chr[i] && j>=0)
+	first_effori_ind[i]=j+1
+	j=i
+	do
+		j+=1
+	while(ori_mat[j][0]<=ori_mat[i][0]+v*t_end && ori_chr[j]==ori_chr[i] && j<=npt)
+	last_effori_ind[i]=j-1
+endfor
+
+variable pnt_in_one_t=1000/(100-0.0001)
+variable t_shift, pnt_shift
+wave b_phit_all, s_phit_all
+make/o/n=1000 eff_phit, shift_phit
+make/o/n=(1000, npt) eff_phit_all
+setscale x,0.0001,80,"", eff_phit, eff_phit_all
+make/o/n=(npt) eff_obs
+
+for(i=0; i<npt; i+=1)
+eff_phit[]=1
+	for(j=first_effori_ind[i]; j<=last_effori_ind[i]; j+=1)
+		if(i==j)
+			eff_phit=eff_phit
+		else
+			shift_phit[]=b_phit_all[p][j]
+			t_shift = abs(ori_mat[j][0]-ori_mat[i][0])/v
+			pnt_shift= t_shift*pnt_in_one_t
+			insertpoints 0, pnt_shift, shift_phit
+			deletepoints 999, pnt_shift, shift_phit
+			eff_phit=eff_phit*(1-shift_phit)
+		endif
+	endfor
+	eff_phit[]=eff_phit[p]*s_phit_all[p][i]
+	eff_phit_all[][i]=eff_phit[p]
+	integrate eff_phit /d=temp
+	eff_obs[i]=temp[750]
+endfor
+killwaves first_effori_ind, last_effori_ind, eff_phit, shift_phit
+end
+//----------------------Finding nearest neighbor distance-------------------
+function FindnnDist(ori_mat, ori_chr)
+wave ori_mat, ori_chr
+
+variable npt=numpnts(ori_chr)
+make/o/n=(npt) ori_nndist, xx
+xx[]=ori_mat[p][0]
+
+ori_nndist[]=(ori_chr[p]==ori_chr[p+1])? min( abs(xx[p]-xx[p-1]),abs(xx[p]-xx[p+1]) ) : abs(xx[p]-xx[p-1])
+ori_nndist[]=(ori_nndist[p]==0)? abs(xx[p]-xx[p+1]) : ori_nndist[p]
+ori_nndist[npt-1]=abs(xx[npt-1] - xx[npt-2])
+
+killwaves xx
+end
+//---------------doing averages over each chromosome and the genome---------
+function AvgPhitAndIt(phit_all, it_all, ori_chr)
+wave phit_all, it_all, ori_chr
+
+make/o/n=(1000,17) avg_phit, avg_it
+setscale x,0,100,"", avg_phit, avg_it
+
+variable i, start_ind, end_ind
+for (i=1;i<=16;i+=1)
+	start_ind=binarysearch(ori_chr, i-1)+1
+	end_ind=binarysearch(ori_chr, i)
+	duplicate/o/r=[0,999][start_ind, end_ind] phit_all, temp_all
+	MatrixOp/o temp_avg = sumrows(temp_all)
+	avg_phit[][i]=temp_avg[p]/(end_ind-start_ind+1)
+	duplicate/o/r=[0,999][start_ind, end_ind] it_all, temp_all
+	MatrixOp/o temp_avg = sumrows(temp_all)
+	avg_it[][i]=temp_avg[p]/(end_ind-start_ind+1)
+endfor
+MatrixOp/o temp_avg = sumrows(phit_all)
+avg_phit[][0]=temp_avg[p]/dimsize(phit_all,1)
+MatrixOp/o temp_avg = sumrows(it_all)
+avg_it[][0]=temp_avg[p]/dimsize(it_all,1)
+
+killwaves temp_all, temp_avg
+end
+//-------------mean-field calculation on efficiency----------------
+function MeanFieldEff(nn, avg_bphit, s_phit_all)
+variable nn
+wave avg_bphit, s_phit_all
+
+variable npt=dimsize(s_phit_all,1)
+
+make/o/n=(npt) eff_obs_MF
+make/o/n=(1000) shift_left, shift_right, eff_phit
+setscale x,0,80,"", eff_phit
+variable i, pnt_shift,v, PinT
+v=1.87
+PinT=1000/(100-0.0001)
+for(i=0; i<npt; i+=1)
+//	pnt_shift=nn[i]/v*PinT //nearest n
+	shift_left[]=avg_bphit[p]
+	pnt_shift=nn/v*PinT//(ori_chr[p]==ori_chr[p-1])? abs(ori_mat[i][0]-ori_mat[i-1][0])/v*PinT : 0
+	insertpoints 0, pnt_shift, shift_left
+	deletepoints 999, pnt_shift, shift_left
+
+//	shift_right[]=avg_bphit[p]
+//	pnt_shift=20.36/v*PinT//(ori_chr[p]==ori_chr[p+1])? abs(ori_mat[i][0]-ori_mat[i+1][0])/v*PinT : 0
+//	insertpoints 0, pnt_shift, shift_right
+//	deletepoints 999, pnt_shift, shift_right
+
+	eff_phit[]=s_phit_all[p][i]*(1-shift_left[p])//*(1-shift_left[p])
+	integrate eff_phit /d=temp
+	eff_obs_MF[i]=temp[750]
+endfor
+killwaves shift_left, shift_right, eff_phit, temp
+end
+
+function GenSphit4MF(ori_thalf)
+wave ori_thalf
+
+variable npt=numpnts(ori_thalf)
+make/o/n=(1000,npt) s_phit_MF
+make/o/n=1000 phit_temp
+setscale x,0,100, "", phit_temp, s_phit_MF
+variable rate
+
+variable i
+for(i=0;i<npt;i+=1)
+	rate = -12+19*ori_thalf[i]^(-0.069)
+	phit_temp=rate*ori_thalf[i]^rate*x^(rate-1)/(x^rate+ori_thalf[i]^rate)^2
+	s_phit_MF[][i]=phit_temp[p]
+endfor
+killwaves phit_temp
+end
+
+//----------------generate f(x,t)--------------------------
+//--------NEED to change fastfit_spec() first------------------
+function GenFxtImage(ori_mat, glo_mat, xw)
+wave ori_mat, glo_mat, xw
+
+variable ntimept=dimsize(glo_mat,1), nx=numpnts(xw)
+make/o/n=4 glo_temp
+make/o/n=(nx, ntimept) fxt_image
+
+variable i
+for(i=0; i<ntimept; i+=1)
+	glo_temp[]=glo_mat[p][i]
+	fastfxt(ori_mat, glo_temp, xw)
+	wave miarray_theo_yw
+	fxt_image[][i]=miarray_theo_yw[p]
+endfor
+
+//killwaves glo_temp
+end
+
+//-----------plot lots of rows------------------
+function PlotLotsOfRows(mat, first_row, last_row)
+wave mat
+variable first_row, last_row
+
+Display mat[][first_row]
+variable i
+for(i=first_row+1; i<=last_row; i+=1)
+	AppendToGraph mat[][i]
+endfor
+
+end
+//----------Change pos by chr <--> pos continue---------------
+function ToPosContinue(chr, pos, chr_length)
+wave chr, pos, chr_length
+variable nchr=numpnts(chr_length)
+variable i
+for(i=2;i<=nchr;i+=1)
+	pos[]=(chr[p]==i)? pos[p]+(i-1)*150+sum(chr_length, 0,i-2) : pos[p]
+endfor
+
+end
+//----------Compare n to MCM data-----------------
+function CompareNandMCM(pos_n, pos_mcm, peak_mcm)
+wave pos_n, pos_mcm, peak_mcm
+
+variable npt=numpnts(pos_n)
+make/o/n=(npt) compare_mcm, indv
+
+variable i, index, pos, ind, diff1, diff2
+for(i=0;i<npt; i+=1)
+	pos=pos_n[i]
+	index=binarysearch(pos_mcm, pos)
+	diff1=abs(pos_n[i]-pos_mcm[index])
+	diff2=abs(pos_n[i]-pos_mcm[index+1])
+	if (min( diff1, diff2 ) < 5)
+		if( diff1 - diff2 > 0)
+			ind=index+1
+		else
+			ind=index
+		endif
+	else
+		ind=-1
+	endif
+	if (ind==-1)
+		compare_mcm[i]=-1
+	else
+		compare_mcm[i]=peak_mcm[ind]
+	endif
+	indv[i]=ind
+endfor
+end
+
+function make_ywT()
+
+wave ori_mat, glo_w, xw, miarray_theo_yw
+
+//variable nTime = 11
+//make/o timePoints = {5, 10, 15, 20, 25, 30, 35, 40, 45, 60, 90}
+//make/o scale = {0.927673,0.819692,0.835142,0.840699,0.959548,1.1696,1.09861,1.1466,1.0735,1.02627,1.03174}
+//variable nxw = 276
+
+//variable nTime = 8
+//make/o timePoints = {10, 15, 20, 25, 30, 35, 40, 45}
+//make/o scale = {0.883,1.006,0.894,0.823,0.739,0.759,0.6793,0.6691}
+//variable nxw = 300
+
+variable nTime = 6
+make/o timePoints = {15, 20, 25, 30, 35, 40}
+make/o scale = {1.01118,1.02942,1.03148,1.02795,0.995042,0.961863}
+variable nxw = 253
+
+make/o/n=(nxw,nTime) ywT
+
+variable t_ind
+for(t_ind=0; t_ind<nTime; t_ind+=1)
+	glo_w[0] = timePoints[t_ind]
+	glo_w[2] = scale[t_ind]
+	fastfxt(ori_mat, glo_w, xw)
+	ywT[][t_ind]=miarray_theo_yw[p]
+endfor
+
+end
+
+//---------------produce LINK in golbal fit------------
+function Link_All_col(inw)
+wave/T inw
+
+variable n_row=dimsize(inw,0), n_col=dimsize(inw,1)
+variable i
+
+for(i=0;i<n_col;i+=1)
+	inw[1,n_row][i][0]="LINK:"+inw[0][i][0]
+endfor
+
+end	
