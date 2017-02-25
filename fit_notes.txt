@@ -32,9 +32,13 @@ you should see many waves and variables generated in NewGlobalFit
 go into the function fastfxt() and check all the lines labeled "CHECK"
 
 PREP FOR FIT STEP 2:
-manully fill in ori_mat, the origin parameters.
-first column is the initial guesses for origin positions.
-second column is the initial guesses for number of initiators.
+manually fill in ori_mat based on your knowledge of the origins’ positions and initiation rate.
+the first column of ori_mat is the initial guesses for origin positions.
+second column of ori_mat is the initial guesses for number of initiators.
+for example:
+RUN the following 2 lines:
+ori_mat[][0] = 20*p + 10 // this sets origin positions 20 units apart with the first origin at position 10
+ori_mat[][1] = enoise(20, n_ori) + 30 // this sets the MIM n to a random number between 10 and 50
 
 IF YOU LOADED DATA, SKIP THIS.
 MAKE SOME FAKE DATA:
@@ -75,6 +79,7 @@ GenSMFitDialogWave()
 
 SETTING UP FIT 1:
 THE INSTRUCTION BELOW USES THE FAKE DATA:
+the instructions below refer to the Global Analysis panel
 under "Data Sets and Functions" tab --> "Data Sets" panel --> "Add Data Sets" pull down menu:
 add yw_t1 to yw_t6 (or your time course data).
 click "X Waves" --> ctrl+click again --> select xw (or your position wave).
