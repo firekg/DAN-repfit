@@ -3,7 +3,7 @@ IT IS TESTED ON ONLY THIS MODEL AND WITH THE FOLLOWING SETTING
 IF YOU RUN INTO PROBLEMS, PLEASE CONTACT ME AT scott.cheng.hsin.yang@gmail.com
 
 OPEN DATA BROWSER
-Data --> Data Broswer
+Data --> Data Browser
 
 A NOTE
 you can RUN inline code by selecting a line and Ctrl+Enter.
@@ -32,31 +32,27 @@ you should see many waves and variables generated in NewGlobalFit
 go into the function fastfxt() and check all the lines labeled "CHECK"
 
 PREP FOR FIT STEP 2:
+IF USING YOUR OWN DATA:
 manually fill in ori_mat based on your knowledge of the origins’ positions and initiation rate.
-the first column of ori_mat is the initial guesses for origin positions.
+for guesses, the first column of ori_mat is the initial guesses for origin positions.
 second column of ori_mat is the initial guesses for number of initiators.
-for example:
-RUN the following 2 lines:
-ori_mat[][0] = 20*p + 10 // this sets origin positions 20 units apart with the first origin at position 10
-ori_mat[][1] = enoise(20, n_ori) + 30 // this sets the MIM n to a random number between 10 and 50
 
-IF YOU LOADED DATA, SKIP THIS.
-MAKE SOME FAKE DATA:
-fill in glo_w, the global parameters:
-for MIM, the parameters are: 
+IF USING FAKE DATA, LET’S FIRST MAKE SOME FAKE DATA:
+SET GLOBAL PARAMETERS:
+RUN the following line to fill in glo_w:
+glo_w[0,5] = {15, 0, 1, 2, 76, 3}
+For MIM, these parameters are: 
 // 1) first time point, 
 // 2) background signal
 // 3) normalization factor
 // 4) fork velocity, 
 // 5) time factor for one initiator, for MIM
 // 6) rate of one initiator, for MIM
-RUN the following line:
-glo_w[0,5] = {15, 0, 1, 2, 76, 3}
-MAKE FAKE ORIGIN POSITIONS:
+SET FAKE ORIGIN POSITIONS:
 RUN the following 4 lines:
 variable dx = (n_pt_probe - n_probe_strlimit - 20)/n_ori
-ori_mat[][0] = dx*p + 10
-ori_mat[][1] = enoise(20, n_ori) + 30
+ori_mat[][0] = dx*p + 10 // this sets origin positions dx units apart with the first origin at position 10
+ori_mat[][1] = enoise(20, n_ori) + 30 // this sets the MIM n to a random number between 10 and 50
 make/o/d/n=(n_ori, 2) ori_mat_data = ori_mat
 MAKE FAKE REPLICATION FRACTION
 RUN the following 7 lines:
@@ -77,26 +73,27 @@ go into the function GenSMFitDialogWave() and check all the lines labeled "CHECK
 RUN the following line:
 GenSMFitDialogWave()
 
-SETTING UP FIT 1:
+SETTING UP FIT, PART 1:
 THE INSTRUCTION BELOW USES THE FAKE DATA:
 the instructions below refer to the Global Analysis panel
 under "Data Sets and Functions" tab --> "Data Sets" panel --> "Add Data Sets" pull down menu:
 add yw_t1 to yw_t6 (or your time course data).
-click "X Waves" --> ctrl+click again --> select xw (or your position wave).
+In the column labeled “X Waves”, shift or command click on the column entries underneath and select “xw” (or your position wave) for all entries
 (can ignore error)
-click "Function" --> ctrl+click again --> select fastfit_miarray_all
-for "# Coefs," use n_ori*ori_spec_coef + n_glo_sepc (for fake data case, 8*2 + 6 = 22) for all.
+In the column labeled “Function”, shift or command click on the column entries underneath and select “fastfit_miarray_all” for all entries
+for "# Coefs,” use the same # for all time points: (n_ori*ori_spec_coef + n_glo_sepc).
+if using fake data, use (8*2 + 6 = 22) for all entries.
 RUN the following line:
 Link_All_col(NewGF_MainCoefListWave)
 (can ignore error)
 under "Coefficients" section:
 select Coefs-K0, then click "Unlink Selection."
 select K2, then click "Unlink Selection."
-these two operations says that
+these two operations imply that
 the time points and normalization factors are not shared across the time-course data,
 but all the other parameters are.
 
-SETTING UP FIT 2:
+SETTING UP FIT, PART 2:
 under "Coefficient Control" Tab:
 click "Initial Guess" --> Load From Wave... --> select "IniGuess"
 click "Hold?" --> Load From Wave... --> select "IniGuess"

@@ -20,7 +20,7 @@ variable/g n_probe_start = 0 //CHECK: start position of data in kb (or any unit)
 
 make/d/o/n=(n_pt_probe) miarray_theo_yw = 0 //f(x,t)
 
-//CHECK: uncomment these if wants to generate fake data
+//CHECK: uncomment these if you want to generate fake data
 setscale x, n_probe_start, n_probe_start + n_pt_probe, "", miarray_theo_yw //set scale of f(x,t)
 make/d/o/n=(n_pt_probe) xw = p + n_probe_start //the position wave
 
