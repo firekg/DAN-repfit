@@ -1,5 +1,5 @@
 THIS DEMO USES THE Multiple Initiator Model (MIM) 
-IT IS TESTED ON ONLY THIS MODEL AND WITH THE FOLLOWING SETTING
+IT IS TESTED ON ONLY THIS MODEL (MIM) AND ONLY WORKS IN IGOR PRO 7 (NOT 6.x).
 IF YOU RUN INTO PROBLEMS, PLEASE CONTACT ME AT scott.cheng.hsin.yang@gmail.com
 
 OPEN DATA BROWSER
@@ -18,11 +18,15 @@ CHANGE FOLDER:
 in Data Browser, find Packages/NewGlobalFit, ctrl+click "NewGlobalFit"--> Set Current Data Folder
 
 IN THIS DEMO, WE WILL MAKE FAKE DATA AND FIT TO IT.
-BUT IF YOU HAVE DATA, YOU CAN LOAD THEM NOW:
-one way is: Data --> Load Waves --> choose the one you want.
-another way is: Windows --> New Table; then copy and paste the data, and rename them.
+BUT IF YOU HAVE DATA, YOU CAN LOAD THEM NOW.
+one way to load is: Data --> Load Waves --> choose the one you want.
+another way to load is: Windows --> New Table; then copy and paste the data, and rename them.
 There should be 1 array for position, 
 and 1 array for the replication fraction at each probed time point.
+
+ANOTHER NOTE:
+The lines marked “CHECK” in the procedures have been set up to run correctly as a default.  
+They need to be checked and likely changed when using your own data.
 
 PREPARE FOR FIT STEP 1:
 go into the function fastfit_spec() and check all the lines labeled "CHECK"
@@ -33,7 +37,7 @@ go into the function fastfxt() and check all the lines labeled "CHECK"
 
 PREP FOR FIT STEP 2:
 IF USING YOUR OWN DATA:
-manually fill in ori_mat based on your knowledge of the origins’ positions and initiation rate.
+manually fill in "ori_mat" based on your knowledge of the origins’ positions and initiation rate.
 for guesses, the first column of ori_mat is the initial guesses for origin positions.
 second column of ori_mat is the initial guesses for number of initiators.
 
@@ -41,13 +45,13 @@ IF USING FAKE DATA, LET’S FIRST MAKE SOME FAKE DATA:
 SET GLOBAL PARAMETERS:
 RUN the following line to fill in glo_w:
 glo_w[0,5] = {15, 0, 1, 2, 76, 3}
-For MIM, these parameters are: 
-// 1) first time point, 
-// 2) background signal
-// 3) normalization factor
-// 4) fork velocity, 
-// 5) time factor for one initiator, for MIM
-// 6) rate of one initiator, for MIM
+For MIM, these parameters [typical unit] are: 
+// 1) first time point [min] 
+// 2) background signal [whatever unit the signal is in]
+// 3) normalization factor [dimensionless]
+// 4) fork velocity [kb/min] 
+// 5) time factor for one initiator, for MIM [min]
+// 6) rate of one initiator, for MIM [dimensionless]
 SET FAKE ORIGIN POSITIONS:
 RUN the following 4 lines:
 variable dx = (n_pt_probe - n_probe_strlimit - 20)/n_ori
@@ -78,9 +82,11 @@ THE INSTRUCTION BELOW USES THE FAKE DATA:
 the instructions below refer to the Global Analysis panel
 under "Data Sets and Functions" tab --> "Data Sets" panel --> "Add Data Sets" pull down menu:
 add yw_t1 to yw_t6 (or your time course data).
-In the column labeled “X Waves”, shift or command click on the column entries underneath and select “xw” (or your position wave) for all entries
+In the column labeled “X Waves”, shift or command click on the column entries underneath 
+and then control click and select “xw” (or your position wave) for all entries
 (can ignore error)
-In the column labeled “Function”, shift or command click on the column entries underneath and select “fastfit_miarray_all” for all entries
+In the column labeled “Function”, shift or command click on the column entries underneath
+and then control click and select “fastfit_miarray_all” for all entries
 for "# Coefs,” use the same # for all time points: (n_ori*ori_spec_coef + n_glo_sepc).
 if using fake data, use (8*2 + 6 = 22) for all entries.
 RUN the following line:
@@ -96,7 +102,7 @@ but all the other parameters are.
 SETTING UP FIT, PART 2:
 under "Coefficient Control" Tab:
 click "Initial Guess" --> Load From Wave... --> select "IniGuess"
-click "Hold?" --> Load From Wave... --> select "IniGuess"
+click "Hold?" --> Load From Wave... --> select "holdw"
 click "Epsilon" --> Load From Wave... --> select "ewave"
 in "Options" section, click "Constraints..."
 RUN the following 2 lines:
